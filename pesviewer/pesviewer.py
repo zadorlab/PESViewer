@@ -855,8 +855,9 @@ def plot():
         lw = options['lw']
         alpha = 1.0
         ls = 'solid'
-#        if line.color == 'gray':
-#            ls = 'dotted'
+        if line.color == 'dotted':
+            ls = 'dotted'
+            line.color = 'gray'
 #        elif line.color == 'blue' or line.color == 'b':
 #            ls = 'dashed'
         if line.straight_line:
