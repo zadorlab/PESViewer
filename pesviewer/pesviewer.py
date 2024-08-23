@@ -1114,6 +1114,9 @@ def generate_2d_depiction():
                         new_pixels.append(pix)
                 img.putdata(new_pixels)
 
+                if 'IRC' in m.name:
+                    img = Image.new("RGB", (1,1), (255, 255, 255, 0))
+
                 if i == 0:
                     img.save(png_filename.format(id=options['id'], name=m.name,
                                                  confid=''))
