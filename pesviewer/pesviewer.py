@@ -224,13 +224,14 @@ class line:
 
 class well:
     # Well class, contains the name, smiles and energy of a well
-    def __init__(self, name, energy, smi=None):
+    def __init__(self, name, energy, smi=None, energy2=None):
         self.name = name
         self.energy = convert_units(energy)
         self.smi = smi
         self.x = 0.
         self.y = 0.
         self.xyz_files = []
+        self.energy2 = energy2
         fn = 'xyz/{name}.xyz'.format(name=name)
         if os.path.exists(fn):
             self.xyz_files.append(fn)
@@ -241,7 +242,7 @@ class well:
 class bimolec:
     # Bimolec class, contains the name,
     # both smiles and energy of a bimolecular product
-    def __init__(self, name, energy, smi=None):
+    def __init__(self, name, energy, smi=None, energy2=None):
         self.name = name
         self.energy = convert_units(energy)
         if smi is None:
@@ -253,6 +254,7 @@ class bimolec:
         self.xyz_files = []
         # this bimolecular product is placed on the right side of the graph
         self.right = False
+        self.energy2 = energy2
         i = 1
         fn = 'xyz/{name}{i}.xyz'.format(name=name, i=i)
         while os.path.exists(fn):
@@ -404,8 +406,10 @@ def read_input(fname):
     options['dpi'] = 120
     # does the plot need to be saved (1) or displayed (0)
     options['save'] = 0
-    # Whether to plot the 
+    # Whether to plot the V vs RC plot.
     options['plot'] = 1
+    # Whether to plot the PES graph
+    options['graph_plot'] = 1
     # booleans tell if the ts energy values should be written
     options['write_ts_values'] = 1
     # booleans tell if the well and bimolecular energy values should be written
@@ -430,6 +434,8 @@ def read_input(fname):
     options['interpolation'] = 'hanning'
     # graphs edge color, if set to 'energy', will be colored by that
     options['graph_edge_color'] = 'black'
+    # graphs edge color, if set to 'energy', will be colored by that
+    options['graph_bimolec_color'] = 'blue'
     # enable/disable generation of 2D depictions for resonant structures.
     options['reso_2d'] = 0
     # print report on paths connecting two species. Replace 0 with the two species names if to be activated.
@@ -471,7 +477,9 @@ def read_input(fname):
                 if not options['save_from_command_line']:
                     options['save'] = int(line.split()[1])
             elif line.startswith('plot'):
-                options['plot'] = int(line.split()[1])            
+                options['plot'] = int(line.split()[1])
+            elif line.startswith('graph_plot'):
+                options['graph_plot'] = bool(int(line.split()[1]))
             elif line.startswith('write_ts_values'):
                 options['write_ts_values'] = int(line.split()[1])
             elif line.startswith('write_well_values'):
@@ -494,6 +502,8 @@ def read_input(fname):
                 options['linear_lines'] = int(line.split()[1])
             elif line.startswith('graph_edge_color'):
                 options['graph_edge_color'] = str(line.split()[1])
+            elif line.startswith('graph_bimolec_color'):
+                options['graph_bimolec_color'] = line.split()[1]
             elif line.startswith('reso_2d'):
                 options['reso_2d'] = int(line.split()[1])
             elif line.startswith('path_report'):
@@ -524,22 +534,30 @@ def read_input(fname):
     for w in input_dict['wells']:
         w = w.split()
         name = w[0]
-        energy = eval(w[1])
+        energy = float(w[1])
+        energy2 = None
         smi = None
         if len(w) > 2 and w[2] != '#':
-            smi = w[2]
+            try:
+                energy2 = float(w[2])
+            except ValueError:
+                smi = w[2]
         # end if
-        w = well(name, energy, smi)
+        w = well(name, energy, smi, energy2)
         wells.append(w)
     # end for
     for b in input_dict['bimolec']:
         b = b.split()
         name = b[0]
-        energy = eval(b[1])
+        energy = float(b[1])
+        energy2 = None
         smi = []
         if len(b) > 2 and b[2] != '#':
-            smi = b[2:]
-        b = bimolec(name, energy, smi)
+            try:
+                energy2 = float(b[2])
+            except ValueError:
+                smi = b[2:]
+        b = bimolec(name, energy, smi, energy2)
         bimolecs.append(b)
     # end for
 
@@ -610,10 +628,16 @@ def position():
         list = (b.energy for b in bimolecs if b.name == options['rescale'])
         y0 = next(list, 0.)
     for w in wells:
-        w.y = w.energy - y0
+        if np.isnan(w.energy):
+            w.y = w.energy2 - y0
+        else:
+            w.y = w.energy - y0
     # end for
     for b in bimolecs:
-        b.y = b.energy - y0
+        if np.isnan(b.energy):
+            b.y = b.energy2 - y0
+        else:
+            b.y = b.energy - y0
     # end for
     for t in tss:
         t.y = t.energy - y0
@@ -831,8 +855,9 @@ def plot():
         lw = options['lw']
         alpha = 1.0
         ls = 'solid'
-#        if line.color == 'gray':
-#            ls = 'dotted'
+        if line.color == 'dotted':
+            ls = 'dotted'
+            line.color = 'gray'
 #        elif line.color == 'blue' or line.color == 'b':
 #            ls = 'dashed'
         if line.straight_line:
@@ -1050,7 +1075,7 @@ def generate_2d_depiction():
                     print(f'Warning: Unable to generate resonant structure for '
                           f'{smi}.')
                     options['reso_2d'] = 0
-            if not options['reso_2d']:
+            else:
                 mol = Chem.MolFromSmiles(smi, sanitize=False)
                 mol.UpdatePropertyCache(strict=False)
                 Chem.SanitizeMol(mol, Chem.SanitizeFlags.SANITIZE_FINDRADICALS
@@ -1394,32 +1419,46 @@ def convert_units(energy):
 def create_interactive_graph(meps):
     """Create an interactive graph with pyvis."""
     
-    g = net.Network(height='1000px', width='90%', heading='')
+    g = net.Network(height='1000px', width='90%', heading='', directed=True)
 
     base_energy = next((species.energy for species in wells + bimolecs 
                         if species.name == options['rescale']), 0)
-    
-    min_well_energy = min([w.energy for w in wells])
-    max_well_energy = max([w.energy for w in wells])
-    well_energy_range = max_well_energy - min_well_energy
     for well in wells:
-        norm_energy = (well.energy - min_well_energy) / well_energy_range
-        size = (1 - norm_energy) * options['node_size_diff'] + 80
-        g.add_node(well.name, label=str(round(well.energy - base_energy, options['rounding'])),
-                   borderWidth=3, title=f'{well.name}', shape='circularImage',
-                   image=f'{options["id"]}_2d/{well.name}_2d.png', size=size,
-                   font='30', color={'background': '#FFFFFF', 
-                                     'border': 'black',
-                                     'highlight': {'border': '#FF00FF', 
-                                                   'background': '#FFFFFF'}})
+        rel_energy = round(well.energy - base_energy, options['rounding'])
+        if np.isnan(rel_energy):
+            label = '❌'
+        else:
+            label = str(rel_energy)
+        if not well.energy2 is None:
+            rel_energy2 = round(well.energy2 - base_energy, options["rounding"])
+            if np.isnan(rel_energy2):
+                label += ' ❌'
+            else:
+                label += f' {rel_energy2}'
+        g.add_node(well.name, label=label, borderWidth=3, title=f'{well.name}', 
+                   shape='circularImage', image=f'{options["id"]}_2d/{well.name}_2d.png', 
+                   size=80, font='30',
+                   color={'background': '#FFFFFF', 'border': 'black',
+                          'highlight': {'border': '#FF00FF', 'background': '#FFFFFF'}})
     for bim in bimolecs:
-        g.add_node(bim.name, label=str(round(bim.energy - base_energy, options['rounding'])),
-                   borderWidth=3, title=f'{bim.name}', shape='circularImage',
-                   image=f'{options["id"]}_2d/{bim.name}_2d.png', size=80,
-                   font='30', color={'background': '#FFFFFF', 
-                                     'border': 'blue',
-                                     'highlight': {'border': '#FF00FF', 
-                                                   'background': '#FFFFFF'}})
+        border_color = options['graph_bimolec_color']
+        rel_energy = round(bim.energy - base_energy, options['rounding'])
+        if np.isnan(rel_energy):
+            label = '❌'
+        else:
+            label = str(rel_energy)
+        if not bim.energy2 is None:
+            rel_energy2 = round(bim.energy2 - base_energy, options["rounding"])
+            if np.isnan(rel_energy2):
+                label += ' ❌'
+            else:
+                label += f' {rel_energy2}'
+        g.add_node(bim.name, label=label, borderWidth=3, title=f'{bim.name}', 
+                   shape='circularImage', image=f'{options["id"]}_2d/{bim.name}_2d.png', 
+                   size=80, font='30', 
+                   color={'background': '#FFFFFF', 'border': border_color,
+                          'highlight': {'border': '#FF00FF', 
+                          'background': '#FFFFFF'}})
 
     min_ts_energy = min([ts.energy for ts in tss])
     max_ts_energy = max([ts.energy for ts in tss])
@@ -1437,10 +1476,11 @@ def create_interactive_graph(meps):
             color = f'rgb({red},{green},{blue})'
         else:  
             color = ts.color
-        g.add_edge(ts.reactant.name, ts.product.name,
-                   title=f'{round(ts.energy - base_energy, options["rounding"])} {options["display_units"]}',
-                   color={"highlight": "#FF00FF", 'color': color}, 
-                   width=(1 - norm_energy) * 20 + 1)
+        rel_energy = round(ts.energy - base_energy, options["rounding"])
+        g.add_edge(ts.reactant.name, ts.product.name, 
+                   title=f'{rel_energy} {options["display_units"]}',
+                   color={'highlight': '#FF00FF', 'color': color}, 
+                   width=(1 - norm_energy) * 20 + 1, arrows='')
 
     for bless in barrierlesss:
         norm_energy = (bless.product.energy - min_ts_energy) / ts_energy_range
@@ -1449,11 +1489,13 @@ def create_interactive_graph(meps):
             color = f'rgb({red},{green},{blue})'
         else:  
             color = bless.color
+        rel_energy = round(bless.product.energy - base_energy, options["rounding"])
         g.add_edge(bless.reactant.name, bless.product.name, 
-                   title=f'{round(bless.product.energy - base_energy, options["rounding"])} {options["display_units"]}', 
+                   title=f'{rel_energy} {options["display_units"]}', 
                    color={"highlight": "#FF00FF", 'color': color},
-                   width=(1 - norm_energy) * 20 + 1)
+                   width=(1 - norm_energy) * 20 + 1, arrows='')
 
+    g.set_edge_smooth('dynamic')
     g.show_buttons(filter_=['physics'])
     g.save_graph(f'{options["id"]}.html')
 
@@ -1564,7 +1606,7 @@ def find_mep(graph, user_input):
 
         print(f'The bottle neck barrier between {spec_1} and {spec_2} with a ' \
               f'{options["search_cutoff"]} depth search is {max_barr} ' \
-              '{options["display_units"]} high.')
+              f'{options["display_units"]} high.')
 
         # write new pesviewer input for just this path
         input_lines = user_input.split('\n')
@@ -1618,7 +1660,9 @@ def main(fname=None):
             print('To draw 2D plots for the individual MEPs type:')
             for mep in meps:
                 print(f'\tpesviewer {mep["species"][0]}_{mep["species"][-1]}.inp')
-    create_interactive_graph(meps)
+    
+    if options['graph_plot']:
+        create_interactive_graph(meps)
 
 
 def pesviewer(fname=None):

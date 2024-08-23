@@ -2,6 +2,6 @@
 build
 dist
 __pycache__
-PESViewer.egg-info
+*egg-info
 .vscode
 .DS_store
