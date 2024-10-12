@@ -49,9 +49,16 @@ def filter_valid_structs(mol: rdkit.Chem.Mol, combs: list, hvy_bond_ids: list) -
     logger.setLevel(RDLogger.ERROR)
     rdBase.DisableLog('rdApp.error')
 
-    atomic_valences = {'C': [4], 'N': [3, 4, 5], 'O': [2], 'H': [1], 'S': [2, 4, 6],
-                       'F': [1], 'Cl': [1, 3, 5, 7], 'Br': [1, 3, 5, 7],
-                       'I': [1, 3, 5, 7]}
+    atomic_valences = {'C': [4], 
+                       'N': [3, 4, 5],
+                       'O': [2], 
+                       'H': [1], 
+                       'S': [2, 4, 6],
+                       'F': [1], 
+                       'Cl': [1, 3, 5, 7], 
+                       'Br': [1, 3, 5, 7],
+                       'I': [1, 3, 5, 7],
+                       'Xe': [0]}
     valid_mols = []
     for comb in combs:
         new_mol = deepcopy(mol)
@@ -71,7 +78,7 @@ def filter_valid_structs(mol: rdkit.Chem.Mol, combs: list, hvy_bond_ids: list) -
                              catchErrors=True)
         except rdkit.Chem.rdchem.AtomSanitizeException:
             continue
-        if any([a.GetExplicitValence() > max(atomic_valences[a.GetSymbol()])
+        if any([a.GetExplicitValence() > max(atomic_valences[a.GetSymbol()]) + a.GetFormalCharge() 
                 for a in new_mol.GetAtoms()]):
             continue
 
@@ -79,7 +86,7 @@ def filter_valid_structs(mol: rdkit.Chem.Mol, combs: list, hvy_bond_ids: list) -
         valid_comb = False
         for a in new_mol.GetAtoms():
             for val in sorted(atomic_valences[a.GetSymbol()]):
-                if a.GetExplicitValence() + a.GetFormalCharge() > val:
+                if a.GetExplicitValence() > val + a.GetFormalCharge():
                     valid_comb = False
                     continue
                 else:
@@ -88,7 +95,8 @@ def filter_valid_structs(mol: rdkit.Chem.Mol, combs: list, hvy_bond_ids: list) -
                     break
             if not valid_comb:
                 break
-            n_rad_elecs = real_val - a.GetExplicitValence() - abs(a.GetFormalCharge())
+            n_rad_elecs = real_val - a.GetExplicitValence() - a.GetFormalCharge()
+            n_rad_elecs = max(n_rad_elecs, 0)
             a.SetNumRadicalElectrons(n_rad_elecs)
         if not valid_comb:
             continue
@@ -119,8 +127,7 @@ def gen_reso_structs(smi: str, min_rads=True) -> list:  # C(=C\\1/[C]C1)\\[CH2]
     hvy_bond_ids = [b.GetIdx() for b in mol.GetBonds()
                     if b.GetBeginAtom().GetSymbol() != 'H'
                     and b.GetEndAtom().GetSymbol() != 'H']
-    num_bonds = int(sum([mol.GetBondWithIdx(bid).GetBondTypeAsDouble()
-                         for bid in hvy_bond_ids]))
+    num_bonds = int(sum([mol.GetBondWithIdx(bid).GetBondTypeAsDouble() for bid in hvy_bond_ids]))
     num_conns = len(hvy_bond_ids)
     radic_elecs = num_rad_elecs(mol)
     max_bonds = num_bonds + radic_elecs // 2

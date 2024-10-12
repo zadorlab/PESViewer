@@ -406,8 +406,10 @@ def read_input(fname):
     options['dpi'] = 120
     # does the plot need to be saved (1) or displayed (0)
     options['save'] = 0
-    # Whether to plot the 
+    # Whether to plot the V vs RC plot.
     options['plot'] = 1
+    # Whether to plot the PES graph
+    options['graph_plot'] = 1
     # booleans tell if the ts energy values should be written
     options['write_ts_values'] = 1
     # booleans tell if the well and bimolecular energy values should be written
@@ -475,7 +477,9 @@ def read_input(fname):
                 if not options['save_from_command_line']:
                     options['save'] = int(line.split()[1])
             elif line.startswith('plot'):
-                options['plot'] = int(line.split()[1])            
+                options['plot'] = int(line.split()[1])
+            elif line.startswith('graph_plot'):
+                options['graph_plot'] = bool(int(line.split()[1]))
             elif line.startswith('write_ts_values'):
                 options['write_ts_values'] = int(line.split()[1])
             elif line.startswith('write_well_values'):
@@ -851,8 +855,9 @@ def plot():
         lw = options['lw']
         alpha = 1.0
         ls = 'solid'
-#        if line.color == 'gray':
-#            ls = 'dotted'
+        if line.color == 'dotted':
+            ls = 'dotted'
+            line.color = 'gray'
 #        elif line.color == 'blue' or line.color == 'b':
 #            ls = 'dashed'
         if line.straight_line:
@@ -1133,6 +1138,9 @@ def generate_2d_depiction():
                     else:
                         new_pixels.append(pix)
                 img.putdata(new_pixels)
+
+                if 'IRC' in m.name:
+                    img = Image.new("RGB", (1,1), (255, 255, 255, 0))
 
                 if i == 0:
                     img.save(png_filename.format(id=options['id'], name=m.name,
@@ -1654,7 +1662,9 @@ def main(fname=None):
             print('To draw 2D plots for the individual MEPs type:')
             for mep in meps:
                 print(f'\tpesviewer {mep["species"][0]}_{mep["species"][-1]}.inp')
-    create_interactive_graph(meps)
+    
+    if options['graph_plot']:
+        create_interactive_graph(meps)
 
 
 def pesviewer(fname=None):
