@@ -960,7 +960,7 @@ def plot():
 
     if options['title']:
         plt.title('Potential energy surface of {id}'.format(id=options['id']))
-    # defualts to units if not specified
+    # defaults to units if not specified
     plt.ylabel('Energy ({display_units})'.format(display_units=options['display_units']))
     if options['save']:
         plt.savefig(f'{options["id"]}_pes_plot.png', bbox_inches='tight')
@@ -1506,6 +1506,8 @@ def write_section(f, input_lines, stopsign, start, path):
                     f.write(f'> <id> aux_{path[0]}_{path[-1]}\n')
                 elif line.startswith('plot'):
                     f.write(f'plot 1\n')
+                elif line.startswith('save'):
+                    f.write('save 0\n')
                 elif line.startswith('path_report') or line.startswith('search_cutoff'):
                     continue
                 else:
