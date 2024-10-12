@@ -7,7 +7,7 @@ package:
 
 source:
     url: https://github.com/zadorlab/PESViewer/archive/{{ version }}.tar.gz
-    sha256: 3dae7c2997a4db0c91883ec00eea34d94e46d87b0af65c2a5c522d280074d7d3
+    sha256: b466288c20ca417a520e128671a58e124381bed037353c7b3571e178eb16df3b
 
 build:
     noarch: python
