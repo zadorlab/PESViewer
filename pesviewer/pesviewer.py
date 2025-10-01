@@ -1057,6 +1057,9 @@ def generate_2d_depiction():
                 f.write('  {:.2f}  {:.2f}  {:.2f}'.format(b.reactant.energy, max(b.reactant.energy, b.product.energy), b.product.energy))
                 f.write('\n')
 
+            for well in wells:
+                f.write(f'{well.name} {well.smi}')
+
     def generate_2d(m, smis):
         
         png_filename = '{id}_2d/{name}_2d{confid}.png'
@@ -1140,7 +1143,7 @@ def generate_2d_depiction():
                 img.putdata(new_pixels)
 
                 if 'IRC' in m.name:
-                    img = Image.new("RGB", (1,1), (255, 255, 255, 0))
+                    img = Image.new("RGBA", (1,1), (255, 255, 255, 0))
 
                 if i == 0:
                     img.save(png_filename.format(id=options['id'], name=m.name,
