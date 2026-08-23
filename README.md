@@ -11,7 +11,7 @@ Their energy is needed to plot the potential energy surface.)
 Written values of the energies and 2D plots (structural formulas) of the wells and products can be added to the figure.)
 -->
 
-To run PESViewer, you need python >= 3.7, matplotlib, numpy and OpenBabel or RDKit to create 2D plots.
+To run PESViewer, you need python >= 3.7, matplotlib, numpy, and both RDKit and OpenBabel to create 2D plots.
 
 While the code can be used as a standalone application, it is designed to work with KinBot, which automatically generates the input files for PESViewer.
 
@@ -34,7 +34,14 @@ from github:
 and then, from within the PESViewer directory produced after cloning, type:
 
     pip install -e .
- 
+
+> **Note**
+> Open Babel is a required dependency but is not declared in `pyproject.toml`,
+> because its PyPI distribution is source-only and needs the Open Babel C++
+> library and SWIG to build. Install it separately with conda:
+>
+>     conda install -c conda-forge openbabel
+
 > **Note**
 > If you want to modify PESViewer yourself it's better to fork the project 
 > into your own repository and then clone it.

@@ -13,7 +13,6 @@ import numpy as np
 import numpy.linalg as la
 from rdkit import Chem
 from rdkit.Chem import Draw, AllChem
-from rdkit.Chem.Draw.cairoCanvas import Canvas
 from openbabel import pybel
 from PIL import Image
 import networkx as nx
@@ -1093,20 +1092,15 @@ def generate_2d_depiction():
             resol = 5
             size_x = 100 * resol
 
-            # NEW METHOD
-            # opts = Draw.rdMolDraw2D.MolDrawOptions()  # New way
-            # opts.minFontSize = 30 * resol
-            # opts.maxFontSize = 9 * resol
-            # opts.bondLineWidth = 1 * resol
-            # opts.padding = 0.15
-            # opts.noAtomLabels = True
-
-            # OLD METHOD (cannot use Draw.MolToImage or Draw.MolToFile):
-            opts = Draw.DrawingOptions()
-            opts.dotsPerAngstrom = 15 * resol
-            opts.atomLabelFontSize = 9 * resol
+            # rdkit >= 2024 removed the legacy drawing stack (DrawingOptions,
+            # MolDrawing and the cairo/agg canvases), so depiction goes through
+            # rdMolDraw2D. Fixing min == max font size reproduces the absolute
+            # atomLabelFontSize the legacy DrawingOptions used. Radicals are
+            # drawn by the new backend without an explicit radicalSymbol.
+            opts = Draw.rdMolDraw2D.MolDrawOptions()
+            opts.minFontSize = 9 * resol
+            opts.maxFontSize = 9 * resol
             opts.bondLineWidth = 1 * resol
-            opts.radicalSymbol = '•'
             for i, mol in enumerate(reson_mols):
                 AllChem.Compute2DCoords(mol)
                 cc = mol.GetConformer()
@@ -1121,16 +1115,11 @@ def generate_2d_depiction():
                 dy = round(max(yy) - min(yy)) * sc
                 size_x = round(size_x * (1 + (max(dx, dy) - 200) / 500))
                 size = (size_x,) * 2
-                # NEW METHOD
-                # img = Draw.MolToImage(mol, kekulize=False, wedgeBonds=False,
-                #                       options=opts, size=size)
-
-                # OLD METHOD (cannot use Draw.MolToImage or Draw.MolToFile):
-                img = Image.new("RGBA", tuple(size))
-                canvas = Canvas(img)
-                drawer = Draw.MolDrawing(canvas=canvas, drawingOptions=opts)
-                drawer.AddMol(mol)
-                canvas.flush()
+                img = Draw.MolToImage(mol, size=size, kekulize=False,
+                                      wedgeBonds=False, options=opts)
+                # MolToImage returns RGB; the white-to-transparent pass below
+                # needs an alpha channel.
+                img = img.convert("RGBA")
 
                 # Convert each white pixel to transparent.
                 pixels = img.getdata()

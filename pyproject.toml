@@ -42,7 +42,12 @@ dependencies = [
         "networkx",
         "pillow",
         "pyvis",
+        "rdkit>=2024.03",
 ]
+# Open Babel is also required (imported as `openbabel.pybel`), but its PyPI
+# distribution is source-only and needs the Open Babel C++ library and SWIG to
+# build, so it cannot be declared here without breaking `pip install`.
+# Install it separately, e.g.:  conda install -c conda-forge openbabel
 
 [project.urls]
 homepage = "https://github.com/zadorlab/PESViewer"
